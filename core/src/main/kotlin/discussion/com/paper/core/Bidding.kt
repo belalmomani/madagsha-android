@@ -21,6 +21,7 @@ class BiddingRound(
     var topBidder: Int? = null; private set
     var outcome: RoundOutcome? = null; private set
     private val active = playerIds.toMutableList()
+    private val bidders = mutableSetOf<Int>()
     private var turn = startIndex % playerIds.size
     val folded: Set<Int> get() = playerIds.toSet() - active.toSet()
     val activePlayers: List<Int> get() = active.toList()
@@ -29,6 +30,7 @@ class BiddingRound(
 
     /** الطلبات المسموحة: تصاعدية فقط، من سينكو إلى الكيس كاملًا (أول أن). */
     fun legalBids(): List<Int> {
+        if (settings.oneBidPerPlayer && currentPlayer in bidders) return emptyList()
         val list = generateSequence(settings.sinko) { it + settings.step }.takeWhile { it < bag }.filter { it > currentBid }.toMutableList()
         if (bag > currentBid) list.add(bag)
         return list
@@ -49,7 +51,7 @@ class BiddingRound(
     fun bid(player: Int, amount: Int) {
         check(!isFinished && player == currentPlayer) { "ليس دور اللاعب" }
         require(amount in legalBids()) { "طلب غير مسموح: $amount" }
-        currentBid = amount; topBidder = player; advance()
+        currentBid = amount; topBidder = player; bidders += player; advance()
     }
 
     fun fold(player: Int) {

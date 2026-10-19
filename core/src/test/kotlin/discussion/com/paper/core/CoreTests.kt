@@ -81,6 +81,16 @@ class BiddingTests {
         val r = round(strong, weak); r.bid(0, 50)
         assertTrue(r.challenge(1) is RoundOutcome.ChallengeLost)
     }
+    @Test fun bidOnlyOncePerPlayer() {
+        val r = round(weak, strong); r.bid(0, 10); r.bid(1, 15); r.bid(2, 20); r.bid(3, 25)
+        assertEquals(0, r.currentPlayer); assertTrue(r.legalBids().isEmpty())
+        assertFailsWith<IllegalArgumentException> { r.bid(0, 30) }
+        r.fold(0); assertEquals(1, r.currentPlayer)
+    }
+    @Test fun bidTwiceAllowedWhenSettingOff() {
+        val r = BiddingRound(S.copy(oneBidPerPlayer = false), listOf(0, 1), mapOf(0 to weak, 1 to strong))
+        r.bid(0, 10); r.bid(1, 15); r.bid(0, 20)
+    }
     @Test fun cannotChallengeWithoutBid() { assertFailsWith<IllegalStateException> { round(weak, strong).challenge(0) } }
 }
 

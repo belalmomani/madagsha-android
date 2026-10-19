@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -46,11 +48,41 @@ val Green = Color(0xFF0B3D24); val Gold = Color(0xFFE8B923); val Cream = Color(0
 
 @Composable fun cardLabel(c: Card): String = c.rank.arabic + when (c.suit) { Suit.SPADES -> "♠"; Suit.HEARTS -> "♥"; Suit.CLUBS -> "♣"; Suit.DIAMONDS -> "♦" }
 
-@Composable fun CardView(c: Card?, modifier: Modifier = Modifier) {
-    val red = c?.suit == Suit.HEARTS || c?.suit == Suit.DIAMONDS
-    Box(modifier.size(64.dp, 92.dp).clip(RoundedCornerShape(8.dp)).background(if (c == null) Color(0xFF14573A) else Cream).border(2.dp, Gold, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-        if (c != null) Text(cardLabel(c), color = if (red) Color(0xFFC62828) else Color.Black, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+/** ورقة برسم احترافي من الأصول. glow = توهج ذهبي، faceUp=false يعرض الظهر. */
+@Composable fun CardView(c: Card?, modifier: Modifier = Modifier, width: androidx.compose.ui.unit.Dp = 64.dp, glow: Boolean = false, faceUp: Boolean = true) {
+    val shape = RoundedCornerShape(width * 0.08f)
+    val res = if (c == null || !faceUp) CardAssets.BACK else CardAssets.face(c)
+    val glowAnim by androidx.compose.animation.core.animateFloatAsState(if (glow) 1f else 0f, androidx.compose.animation.core.tween(220), label = "glow")
+    Image(painterResource(res), null,
+        modifier.width(width).aspectRatio(420f / 607f)
+            .shadow((4 + 14 * glowAnim).dp, shape, ambientColor = Gold, spotColor = if (glow) Gold else Color.Black)
+            .then(if (glow) Modifier.border(2.dp, Gold, shape) else Modifier),
+        contentScale = ContentScale.Fit)
+}
+
+/** توزيع متحرك: تنطلق الورقة من منتصف الطاولة وتنقلب لتظهر. delayMs لتتابع التوزيع. */
+@Composable fun DealtCard(c: Card, index: Int, total: Int, width: androidx.compose.ui.unit.Dp = 72.dp) {
+    val t = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 140L)
+        t.animateTo(1f, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
     }
+    val fan = (index - (total - 1) / 2f)
+    Box(Modifier.graphicsLayer {
+        val p = t.value
+        translationY = (1f - p) * -520f
+        rotationZ = (1f - p) * -30f + p * fan * 4f
+        rotationY = if (p < 0.5f) p * 360f else (1f - p) * 360f
+        cameraDistance = 14f * density
+        alpha = (p * 4f).coerceIn(0f, 1f)
+    }) { CardView(c, width = width, faceUp = t.value >= 0.5f) }
+}
+
+/** الأوراق الداعمة للتركيبة الرابحة (المجموعة الأولى). */
+fun winningCards(hand: List<Card>): Set<Card> {
+    val top = HandEvaluator.groups(hand).first()
+    return if (top.first >= 2) hand.filter { it.rank.power == top.second }.toSet()
+    else hand.filter { it.rank.power == top.second }.take(1).toSet()
 }
 
 @Composable fun AppRoot(vm: GameViewModel) {
@@ -119,7 +151,7 @@ val Green = Color(0xFF0B3D24); val Gold = Color(0xFFE8B923); val Cream = Color(0
 @Composable fun Deal(vm: GameViewModel) = Page {
     Title("توزيع الأوراق")
     Text("تم توزيع ${vm.settings.cardsPerPlayer} أوراق لكل لاعب", color = Color.White)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { vm.hands[0].orEmpty().forEach { CardView(it) } }
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { vm.hands[0].orEmpty().let { h -> h.forEachIndexed { i, c -> DealtCard(c, i, h.size, 78.dp) } } }
     Spacer(Modifier.height(16.dp)); GoldButton("إلى الطاولة") { vm.beginTable() }
 }
 
@@ -139,7 +171,17 @@ val Green = Color(0xFF0B3D24); val Gold = Color(0xFFE8B923); val Cream = Color(0
             }
         }
         Column(Modifier.weight(1f).fillMaxWidth()) { vm.log.takeLast(5).forEach { Text(it, color = Color.White, fontSize = 14.sp) } }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { vm.hands[0].orEmpty().forEach { CardView(it, Modifier.padding(2.dp)) } }
+        var selected by remember(vm.round) { mutableStateOf<Card?>(null) }
+        Row(Modifier.fillMaxWidth().height(130.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Bottom) {
+            val h = vm.hands[0].orEmpty()
+            h.forEachIndexed { i, c ->
+                val mid = (h.size - 1) / 2f
+                val up by androidx.compose.animation.core.animateDpAsState(if (selected == c) (-14).dp else 0.dp, label = "up")
+                CardView(c, Modifier.padding(horizontal = 1.dp).offset(y = up + (kotlin.math.abs(i - mid) * 3).dp)
+                    .graphicsLayer { rotationZ = (i - mid) * 4f }.clickable { selected = if (selected == c) null else c },
+                    width = 76.dp, glow = selected == c)
+            }
+        }
         Text(if (r.currentPlayer == 0 && !r.isFinished) "دورك" else "انتظر...", color = Gold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         val myTurn = r.currentPlayer == 0 && !r.isFinished
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -174,8 +216,9 @@ val Green = Color(0xFF0B3D24); val Gold = Color(0xFFE8B923); val Cream = Color(0
         }, color = Color.White, textAlign = TextAlign.Center)
     }
     vm.ids.forEach { id -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
-        Text("${vm.name(id)}: ", color = Color.White, modifier = Modifier.width(80.dp))
-        vm.hands[id].orEmpty().forEach { Text(cardLabel(it) + " ", color = Gold) }
+        Text("${vm.name(id)}: ", color = Color.White, modifier = Modifier.width(64.dp))
+        val hh = vm.hands[id].orEmpty(); val win = if (id == o?.winnerId) winningCards(hh) else emptySet()
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { hh.forEach { CardView(it, width = 40.dp, glow = it in win) } }
         Spacer(Modifier.weight(1f)); Text("${l?.balances?.get(id) ?: 0}", color = Gold)
     } }
     Spacer(Modifier.height(12.dp)); GoldButton("جولة جديدة") { vm.newRound() }
@@ -227,6 +270,7 @@ val Green = Color(0xFF0B3D24); val Gold = Color(0xFFE8B923); val Cream = Color(0
     row("تجاوز الهدف", if (s.overshootPolicy == OvershootPolicy.IGNORE_GAIN) "يُتجاهل الربح" else "يرتد للخلف") {
         vm.settings = s.copy(overshootPolicy = if (s.overshootPolicy == OvershootPolicy.IGNORE_GAIN) OvershootPolicy.BOUNCE_BACK else OvershootPolicy.IGNORE_GAIN) }
     row("الأرصدة السالبة", if (s.allowNegativeBalance) "مسموحة" else "ممنوعة") { vm.settings = s.copy(allowNegativeBalance = !s.allowNegativeBalance) }
+    row("الطلب مرة واحدة لكل لاعب", if (s.oneBidPerPlayer) "نعم" else "لا") { vm.settings = s.copy(oneBidPerPlayer = !s.oneBidPerPlayer) }
     row("الكيس", "${s.bagStart}") { vm.settings = s.copy(bagStart = if (s.bagStart >= 500) 100 else s.bagStart + 100) }
     Spacer(Modifier.height(12.dp)); GoldButton("رجوع") { vm.go(Screen.HOME) }
 }

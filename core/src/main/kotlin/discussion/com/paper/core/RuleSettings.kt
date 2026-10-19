@@ -37,7 +37,9 @@ data class RuleSettings(
     /** يخسر صاحب الطلب قيمة الطلب للمتحدي الناجح (وإلا تُدفع من الكيس). */
     val successfulChallengeBidderPays: Boolean = true,
     /** في الشراكة: الجائزة تُوزَّع على زملاء الفريق فقط. */
-    val teamPrizeOnlyTeammates: Boolean = true
+    val teamPrizeOnlyTeammates: Boolean = true,
+    /** الطلب مرة واحدة فقط لكل لاعب في الجولة؛ بعدها يستطيع الانسحاب أو المداقشة فقط. */
+    val oneBidPerPlayer: Boolean = true
 ) {
     val sinko: Int get() = sinkoUnits * unitValue
     val step: Int get() = if (raiseStep > 0) raiseStep else sinko
