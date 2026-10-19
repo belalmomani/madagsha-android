@@ -20,6 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -87,6 +91,26 @@ fun winningCards(hand: List<Card>): Set<Card> {
     else hand.filter { it.rank.power == top.second }.take(1).toSet()
 }
 
+/** صورة لاعب: بورتريه دائري بإطار ذهبي، توهج نابض عند دوره، وشارة اسم/رصيد مقروءة. */
+@Composable fun PlayerAvatar(name: String, balance: Int, avatar: Int, size: Dp, active: Boolean, folded: Boolean, isTop: Boolean, modifier: Modifier = Modifier) {
+    val pulse by androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse").animateFloat(0.45f, 1f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(700), androidx.compose.animation.core.RepeatMode.Reverse), label = "a")
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.TopEnd) {
+            Image(painterResource(avatarRes(avatar)), null,
+                Modifier.size(size).shadow(if (active) 14.dp else 6.dp, CircleShape, ambientColor = Gold, spotColor = if (active) Gold else Color.Black)
+                    .clip(CircleShape).border(if (active) 4.dp else 2.5.dp, if (active) Gold.copy(alpha = pulse) else Gold.copy(alpha = 0.85f), CircleShape)
+                    .graphicsLayer { alpha = if (folded) 0.35f else 1f })
+            if (isTop) Box(Modifier.size(size * 0.3f).clip(CircleShape).background(Gold), contentAlignment = Alignment.Center) { Text("★", color = Color.Black, fontSize = (size.value * 0.18f).sp) }
+        }
+        Column(Modifier.offset(y = (-10).dp).clip(RoundedCornerShape(12.dp)).background(Color(0xDD06261A)).border(1.dp, Gold.copy(alpha = 0.6f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(name, color = Color.White, fontSize = (size.value * 0.19f).coerceIn(11f, 15f).sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text("$balance", color = Gold, fontSize = (size.value * 0.19f).coerceIn(11f, 15f).sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 @Composable fun AppRoot(vm: GameViewModel) {
     when (vm.screen) {
         Screen.HOME -> Home(vm); Screen.MODE -> Mode(vm); Screen.COUNT -> Count(vm); Screen.TEAMS -> Teams(vm)
@@ -138,11 +162,16 @@ fun winningCards(hand: List<Card>): Set<Card> {
     var v by remember { mutableStateOf(vm.avatarVersion) }; v.let { }
     var err by remember { mutableStateOf("") }
     val mine = vm.picker.avatarOf(0)
-    LazyVerticalGrid(GridCells.Fixed(4), Modifier.height(260.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyVerticalGrid(GridCells.Fixed(4), Modifier.height(320.dp).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items((1..8).toList()) { a ->
             val takenByOther = vm.picker.isTaken(a) && mine != a
-            Image(painterResource(avatarRes(a)), null, Modifier.size(72.dp).clip(CircleShape).border(if (mine == a) 4.dp else 1.dp, if (mine == a) Gold else Color.Gray, CircleShape)
-                .clickable { if (!vm.pickAvatar(a)) err = "هذه الشخصية مختارة" else { err = ""; v = vm.avatarVersion } }, alpha = if (takenByOther) 0.3f else 1f)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painterResource(avatarRes(a)), null, Modifier.fillMaxWidth().aspectRatio(1f).padding(2.dp).shadow(if (mine == a) 12.dp else 4.dp, CircleShape, ambientColor = Gold, spotColor = Gold).clip(CircleShape)
+                    .border(if (mine == a) 4.dp else 2.dp, if (mine == a) Gold else Gold.copy(alpha = 0.5f), CircleShape)
+                    .clickable { if (!vm.pickAvatar(a)) err = "هذه الشخصية مختارة" else { err = ""; v = vm.avatarVersion } }
+                    .graphicsLayer { alpha = if (takenByOther) 0.3f else 1f })
+                Text(vm.avatarNames[a - 1], color = if (mine == a) Gold else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
     if (err.isNotEmpty()) Text(err, color = Color(0xFFFF8A80))
@@ -163,16 +192,28 @@ fun winningCards(hand: List<Card>): Set<Card> {
     vm.tick.let { }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(8.dp)) {
         Text("الكيس: ${r.bag}   الطلب الحالي: ${if (r.currentBid == 0) "—" else r.currentBid}", color = Gold, fontSize = 18.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
-            items(vm.ids.drop(1)) { id ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(painterResource(avatarRes(vm.picker.avatarOf(id) ?: 8)), null, Modifier.size(52.dp).clip(CircleShape).border(if (r.currentPlayer == id) 3.dp else 1.dp, Gold, CircleShape), alpha = if (id in r.folded) 0.3f else 1f)
-                    Text(vm.name(id) + if (r.topBidder == id) " ★" else "", color = Color.White, fontSize = 12.sp)
-                    Text("${vm.ledger?.balances?.get(id) ?: 0}", color = Gold, fontSize = 12.sp)
-                }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val opp = vm.ids.drop(1); val n = opp.size
+            val sz = (maxWidth / 5.2f).coerceIn(48.dp, 78.dp)
+            val itemW = sz + 18.dp; val itemH = sz * 1.45f
+            val humanSz = sz * 1.4f
+            val rx = ((maxWidth - itemW) / 2f).value
+            val cyArc = (maxHeight.value * 0.58f)
+            val ry = (cyArc - itemH.value / 2f - 4f).coerceAtLeast(40f)
+            opp.forEachIndexed { k, id ->
+                val th = if (n == 1) PI / 2 else PI * (0.07 + 0.86 * k / (n - 1))
+                val a = PI - th
+                val x = maxWidth.value / 2f + rx * cos(a).toFloat() - itemW.value / 2f
+                val y = cyArc - ry * sin(a).toFloat() - itemH.value / 2f
+                PlayerAvatar(vm.name(id), vm.ledger?.balances?.get(id) ?: 0, vm.picker.avatarOf(id) ?: 8, sz, r.currentPlayer == id && !r.isFinished, id in r.folded, r.topBidder == id,
+                    Modifier.offset(x.dp, y.dp).width(itemW))
             }
+            Column(Modifier.align(Alignment.Center).fillMaxWidth(0.55f).offset(y = (-6).dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                vm.log.takeLast(4).forEach { Text(it, color = Color.White, fontSize = 13.sp, textAlign = TextAlign.Center) }
+            }
+            PlayerAvatar(vm.name(0), vm.ledger?.balances?.get(0) ?: 0, vm.picker.avatarOf(0) ?: 1, humanSz, r.currentPlayer == 0 && !r.isFinished, 0 in r.folded, r.topBidder == 0,
+                Modifier.align(Alignment.BottomCenter))
         }
-        Column(Modifier.weight(1f).fillMaxWidth()) { vm.log.takeLast(5).forEach { Text(it, color = Color.White, fontSize = 14.sp) } }
         var selected by remember(vm.round) { mutableStateOf<Card?>(null) }
         Row(Modifier.fillMaxWidth().height(130.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Bottom) {
             val h = vm.hands[0].orEmpty()

@@ -4,3 +4,8 @@
 - **الربط بالكود:** `CardAssets.kt` (جدول واضح لكل ورقة) • العرض والحركة والتوهج: `CardView` و`DealtCard` في `Screens.kt`.
 - **التغيير لاحقاً:** إما استبدل أي PNG بنفس الاسم والنسبة، أو عدّل `tools/generate_cards.py` (ألوان كل نوع في `PAL`، الشخصيات في `fig_king/fig_queen/fig_jack`، الظهر في `back_card`) ثم شغّل `python3 tools/generate_cards.py` (يحتاج Pillow وخط DejaVu).
 - **الحركة:** توزيع من المنتصف مع دوران وقلب (`DealtCard`)، رفع الورقة وتوهج ذهبي عند اللمس، وتوهج الأوراق الرابحة في شاشة النتيجة.
+
+# صور اللاعبين
+- 8 بورتريهات أصلية: `app/src/main/res/drawable-nodpi/avatar_1.png … avatar_8.png` (512×512، دائرية، خلفية خضراء داكنة).
+- الأسماء بحسب المظهر في `GameViewModel.avatarNames` (الترتيب نفسه). العرض في `PlayerAvatar` (إطار ذهبي، توهج نابض عند الدور، شارة اسم/رصيد).
+- لتغيير الصور: استبدل الملفات بنفس الاسم، أو عدّل `tools/generate_avatars.py` (قائمة `PEOPLE`).

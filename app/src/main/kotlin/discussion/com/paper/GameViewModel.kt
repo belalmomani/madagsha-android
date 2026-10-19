@@ -39,8 +39,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var secondsLeft by mutableStateOf(0)
     private var timerJob: Job? = null
 
-    val botNames = listOf("أحمد", "نور", "خالد", "فهد", "ريم", "سعد", "ليث")
-    fun name(id: Int) = if (id == 0) humanName else botNames[(id - 1) % botNames.size]
+    /** اسم كل شخصية يطابق مظهرها (الترتيب = avatar_1..avatar_8). */
+    val avatarNames = listOf("سعود", "أبو ناصر", "نور", "ريم", "فهد", "خالد", "هدى", "ليث")
+    fun name(id: Int): String {
+        if (id == 0) return humanName
+        val a = picker.avatarOf(id) ?: return "لاعب ${id + 1}"
+        return avatarNames[a - 1]
+    }
     val ids get() = (0 until playerCount).toList()
 
     fun go(s: Screen) { screen = s }
@@ -49,7 +54,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startMatch() {
         // الشخصيات الباقية تُوزَّع على الذكاء الاصطناعي دون تكرار
-        val free = picker.free().toMutableList()
+        val free = picker.free().shuffled().toMutableList()
         for (id in 1 until playerCount) if (picker.avatarOf(id) == null) picker.pick(id, free.removeAt(0))
         val teams = if (teamMode) listOf(ids.filter { it % 2 == 0 }, ids.filter { it % 2 == 1 }) else emptyList()
         ledger = Ledger(settings, ids, teams)
