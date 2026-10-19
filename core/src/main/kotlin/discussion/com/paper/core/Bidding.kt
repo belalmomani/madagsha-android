@@ -3,10 +3,13 @@ package discussion.com.paper.core
 sealed interface RoundOutcome {
     val winnerId: Int
     val loserId: Int?
+    /** ما يربحه الفائز. */
     val amount: Int
-    data class BidWon(override val winnerId: Int, override val amount: Int) : RoundOutcome { override val loserId: Int? = null }
-    data class ChallengeWon(override val winnerId: Int, override val loserId: Int, override val amount: Int) : RoundOutcome
-    data class ChallengeLost(override val winnerId: Int, override val loserId: Int, override val amount: Int) : RoundOutcome
+    /** ما يخسره الخاسر. */
+    val loserAmount: Int
+    data class BidWon(override val winnerId: Int, override val amount: Int) : RoundOutcome { override val loserId: Int? = null; override val loserAmount: Int = 0 }
+    data class ChallengeWon(override val winnerId: Int, override val loserId: Int, override val amount: Int, override val loserAmount: Int = amount) : RoundOutcome
+    data class ChallengeLost(override val winnerId: Int, override val loserId: Int, override val amount: Int, override val loserAmount: Int = amount) : RoundOutcome
 }
 
 /** جولة طلب واحدة. الترتيب: كل لاعب نشط يطلب أو ينسحب أو يداقش. */
@@ -22,6 +25,7 @@ class BiddingRound(
     var outcome: RoundOutcome? = null; private set
     private val active = playerIds.toMutableList()
     private val bidders = mutableSetOf<Int>()
+    private val bids = mutableMapOf<Int, Int>()
     private var turn = startIndex % playerIds.size
     val folded: Set<Int> get() = playerIds.toSet() - active.toSet()
     val activePlayers: List<Int> get() = active.toList()
@@ -51,7 +55,7 @@ class BiddingRound(
     fun bid(player: Int, amount: Int) {
         check(!isFinished && player == currentPlayer) { "ليس دور اللاعب" }
         require(amount in legalBids()) { "طلب غير مسموح: $amount" }
-        currentBid = amount; topBidder = player; bidders += player; advance()
+        currentBid = amount; topBidder = player; bidders += player; bids[player] = amount; advance()
     }
 
     fun fold(player: Int) {
@@ -73,9 +77,16 @@ class BiddingRound(
         require(challenger != bidder) { "لا يداقش اللاعب نفسه" }
         val cmp = HandEvaluator.compare(hands.getValue(challenger), hands.getValue(bidder), settings)
         val challengerWins = cmp > 0 || (cmp == 0 && settings.tieBreak == TieBreak.CHALLENGER_WINS)
-        val o = if (challengerWins) RoundOutcome.ChallengeWon(challenger, bidder, currentBid)
-        else RoundOutcome.ChallengeLost(bidder, challenger, currentBid)
+        fun own(p: Int) = if (settings.payoutMode == PayoutMode.OWN_BID) (bids[p] ?: currentBid) else currentBid
+        val o = if (challengerWins) RoundOutcome.ChallengeWon(challenger, bidder, own(challenger), own(bidder))
+        else RoundOutcome.ChallengeLost(bidder, challenger, own(bidder), own(challenger))
         outcome = o
         return o
+    }
+
+    /** انتهى وقت اللاعب: سينكو تلقائي إن كان مسموحًا، وإلا انسحاب. يعيد true إذا طُلب سينكو. */
+    fun onTimeout(player: Int): Boolean {
+        check(!isFinished && player == currentPlayer) { "ليس دور اللاعب" }
+        return if (settings.sinko in legalBids()) { bid(player, settings.sinko); true } else { fold(player); false }
     }
 }

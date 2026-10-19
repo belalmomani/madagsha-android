@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import discussion.com.paper.core.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -35,6 +36,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     val log = mutableStateListOf<String>()
     var roundNo = 0
     var message by mutableStateOf("")
+    var secondsLeft by mutableStateOf(0)
+    private var timerJob: Job? = null
 
     val botNames = listOf("أحمد", "نور", "خالد", "فهد", "ريم", "سعد", "ليث")
     fun name(id: Int) = if (id == 0) humanName else botNames[(id - 1) % botNames.size]
@@ -60,7 +63,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         hands = ids.associateWith { deal.hands[it] }
         round = BiddingRound(settings, ids, hands, settings.bagStart, roundNo % playerCount)
         roundNo++
-        outcome = null; log.clear(); screen = Screen.DEAL
+        timerJob?.cancel(); outcome = null; log.clear(); screen = Screen.DEAL
     }
 
     fun beginTable() { screen = Screen.TABLE; tick++; driveBots() }
@@ -72,7 +75,23 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             botAct(r)
             tick++
         }
-        if (r.isFinished) finishRound(r.outcome!!)
+        if (r.isFinished) finishRound(r.outcome!!) else startHumanTimer()
+    }
+
+    /** مهلة الدور: دقيقة كحد أقصى، وعند انتهائها سينكو تلقائي (أو انسحاب إن لم يعد ممكنًا). */
+    private fun startHumanTimer() {
+        timerJob?.cancel()
+        val r = round ?: return
+        if (r.isFinished || r.currentPlayer != 0) return
+        timerJob = viewModelScope.launch {
+            secondsLeft = settings.turnSeconds
+            while (secondsLeft > 0) { delay(1000); secondsLeft-- }
+            if (!r.isFinished && r.currentPlayer == 0) {
+                val auto = r.onTimeout(0)
+                log += if (auto) "انتهى الوقت: سينكو تلقائي" else "انتهى الوقت: انسحاب تلقائي"
+                afterHuman(r)
+            }
+        }
     }
 
     private fun strength(h: List<Card>) = HandEvaluator.groups(h).first().let { it.first * 10 + it.second }
@@ -93,12 +112,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---- أفعال اللاعب البشري ----
-    fun humanBid(a: Int) { val r = round ?: return; if (r.currentPlayer != 0 || r.isFinished) return; r.bid(0, a); log += "${name(0)} يطلب $a"; afterHuman(r) }
-    fun humanFold() { val r = round ?: return; if (r.currentPlayer != 0 || r.isFinished) return; r.fold(0); log += "${name(0)} ينسحب"; afterHuman(r) }
+    fun humanBid(a: Int) { val r = round ?: return; if (r.currentPlayer != 0 || r.isFinished) return; timerJob?.cancel(); r.bid(0, a); log += "${name(0)} يطلب $a"; afterHuman(r) }
+    fun humanFold() { val r = round ?: return; if (r.currentPlayer != 0 || r.isFinished) return; timerJob?.cancel(); r.fold(0); log += "${name(0)} ينسحب"; afterHuman(r) }
     fun humanChallenge() {
         val r = round ?: return
         if (r.currentPlayer != 0 || r.isFinished || r.topBidder == null || r.topBidder == 0) { message = "لا يمكن المداقشة الآن"; return }
-        r.challenge(0); afterHuman(r)
+        timerJob?.cancel(); r.challenge(0); afterHuman(r)
     }
     private fun afterHuman(r: BiddingRound) { tick++; if (r.isFinished) finishRound(r.outcome!!) else driveBots() }
 

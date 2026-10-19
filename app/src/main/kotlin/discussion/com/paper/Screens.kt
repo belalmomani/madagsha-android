@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -182,7 +184,7 @@ fun winningCards(hand: List<Card>): Set<Card> {
                     width = 76.dp, glow = selected == c)
             }
         }
-        Text(if (r.currentPlayer == 0 && !r.isFinished) "دورك" else "انتظر...", color = Gold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Text(if (r.currentPlayer == 0 && !r.isFinished) "دورك — ${vm.secondsLeft} ث (وإلا سينكو تلقائي)" else "انتظر...", color = Gold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         val myTurn = r.currentPlayer == 0 && !r.isFinished
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (myTurn) items(r.legalBids().take(12)) { b ->
@@ -211,8 +213,8 @@ fun winningCards(hand: List<Card>): Set<Card> {
     if (o != null) {
         Text(when (o) {
             is RoundOutcome.BidWon -> "${vm.name(o.winnerId)} فاز بالطلب ${o.amount}"
-            is RoundOutcome.ChallengeWon -> "نجحت المداقشة! ${vm.name(o.winnerId)} يفوز على ${vm.name(o.loserId)} بـ ${o.amount}"
-            is RoundOutcome.ChallengeLost -> "فشلت المداقشة. ${vm.name(o.winnerId)} يفوز بـ ${o.amount}"
+            is RoundOutcome.ChallengeWon -> "نجحت المداقشة! ${vm.name(o.winnerId)} يربح ${o.amount} و${vm.name(o.loserId)} يخسر ${o.loserAmount}"
+            is RoundOutcome.ChallengeLost -> "فشلت المداقشة. ${vm.name(o.winnerId)} يربح ${o.amount} و${vm.name(o.loserId)} يخسر ${o.loserAmount}"
         }, color = Color.White, textAlign = TextAlign.Center)
     }
     vm.ids.forEach { id -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
@@ -226,20 +228,31 @@ fun winningCards(hand: List<Card>): Set<Card> {
 
 @Composable fun Prize(vm: GameViewModel) = Page {
     val o = vm.outcome ?: return@Page
-    Title("توزيع الجائزة")
-    Text("جائزتك ${o.amount}. يمكنك إعطاء أي مبلغ للاعبين تختارهم (المجموع ≤ ${o.amount}).", color = Color.White, textAlign = TextAlign.Center)
-    val shares = remember { mutableStateMapOf<Int, String>() }
     val l = vm.ledger
-    vm.ids.drop(1).forEach { id ->
-        val allowed = l == null || l.validateDistribution(0, o.amount, mapOf(id to 0)) == null
-        if (allowed) OutlinedTextField(shares[id] ?: "", { shares[id] = it.filter(Char::isDigit) }, label = { Text(vm.name(id)) }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(2.dp))
+    Title("توزيع الجائزة")
+    Text("جائزتك ${o.amount}. علّم ✓ على الشريك ثم اكتب المبلغ، أو لا تعطِ أحداً.", color = Color.White, textAlign = TextAlign.Center)
+    val checked = remember { mutableStateMapOf<Int, Boolean>() }
+    val amounts = remember { mutableStateMapOf<Int, String>() }
+    val candidates = vm.ids.drop(1).filter { l == null || l.validateDistribution(0, o.amount, mapOf(it to 0)) == null }
+    val given = candidates.filter { checked[it] == true }.sumOf { amounts[it]?.toIntOrNull() ?: 0 }
+    val remaining = o.amount - given
+    candidates.forEach { id ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked[id] == true, { checked[id] = it }, colors = CheckboxDefaults.colors(checkedColor = Gold, checkmarkColor = Color.Black, uncheckedColor = Color.White))
+            Text(vm.name(id), color = Color.White, modifier = Modifier.width(72.dp))
+            OutlinedTextField(amounts[id] ?: "", { amounts[id] = it.filter(Char::isDigit) }, enabled = checked[id] == true, singleLine = true,
+                label = { Text("المبلغ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f).padding(2.dp))
+        }
     }
-    var err by remember { mutableStateOf("") }
-    if (err.isNotEmpty()) Text(err, color = Color(0xFFFF8A80))
     Spacer(Modifier.height(8.dp))
-    GoldButton("تأكيد") {
-        val map = shares.mapNotNull { (k, v) -> v.toIntOrNull()?.takeIf { it > 0 }?.let { k to it } }.toMap()
-        vm.applyPrize(map)?.let { err = it }
+    Text("المتبقي لك: $remaining", color = if (remaining < 0) Color(0xFFFF8A80) else Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(8.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        GoldButton("تأكيد التوزيع", remaining >= 0, Modifier.weight(1f)) {
+            val map = candidates.filter { checked[it] == true }.mapNotNull { id -> amounts[id]?.toIntOrNull()?.takeIf { it > 0 }?.let { id to it } }.toMap()
+            vm.applyPrize(map)
+        }
+        GoldButton("لا أعطي أحداً", true, Modifier.weight(1f)) { vm.applyPrize(emptyMap()) }
     }
 }
 

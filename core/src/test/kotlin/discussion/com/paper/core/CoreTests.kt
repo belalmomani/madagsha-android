@@ -91,6 +91,16 @@ class BiddingTests {
         val r = BiddingRound(S.copy(oneBidPerPlayer = false), listOf(0, 1), mapOf(0 to weak, 1 to strong))
         r.bid(0, 10); r.bid(1, 15); r.bid(0, 20)
     }
+    @Test fun winnerGainsOwnBidLoserLosesOwnBid() {
+        val r = round(strong, weak); r.bid(0, 10); r.bid(1, 15); r.bid(2, 20); r.bid(3, 25)
+        assertEquals(RoundOutcome.ChallengeWon(0, 3, 10, 25), r.challenge(0))
+    }
+    @Test fun timeoutBidsSinkoAutomatically() {
+        val r = round(weak, strong); assertTrue(r.onTimeout(0)); assertEquals(5, r.currentBid)
+    }
+    @Test fun timeoutFoldsWhenSinkoNoLongerLegal() {
+        val r = round(weak, strong); r.bid(0, 20); assertFalse(r.onTimeout(1)); assertTrue(1 in r.folded)
+    }
     @Test fun cannotChallengeWithoutBid() { assertFailsWith<IllegalStateException> { round(weak, strong).challenge(0) } }
 }
 
@@ -104,6 +114,10 @@ class LedgerTests {
     @Test fun challengeMovesPoints() {
         val l = ledger(); l.applyOutcome(RoundOutcome.ChallengeWon(1, 0, 40))
         assertEquals(40, l.balances[1]); assertEquals(-40, l.balances[0])
+    }
+    @Test fun loserPaysOwnBid() {
+        val l = ledger(); l.applyOutcome(RoundOutcome.ChallengeWon(0, 3, 10, 25))
+        assertEquals(10, l.balances[0]); assertEquals(-25, l.balances[3])
     }
     @Test fun mustReachExactly5000() {
         val l = ledger(S.copy(targetScore = 100)); l.balances[0] = 95

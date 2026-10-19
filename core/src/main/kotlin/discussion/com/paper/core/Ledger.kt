@@ -40,8 +40,8 @@ class Ledger(val settings: RuleSettings, val playerIds: List<Int>, val teams: Li
         validateDistribution(o.winnerId, prize, shares)?.let { throw IllegalArgumentException(it) }
         when (o) {
             is RoundOutcome.BidWon -> { }
-            is RoundOutcome.ChallengeWon -> if (settings.successfulChallengeBidderPays) add(o.loserId, -prize)
-            is RoundOutcome.ChallengeLost -> if (settings.failedChallengePenalty) add(o.loserId, -prize)
+            is RoundOutcome.ChallengeWon -> if (settings.successfulChallengeBidderPays) add(o.loserId, -o.loserAmount)
+            is RoundOutcome.ChallengeLost -> if (settings.failedChallengePenalty) add(o.loserId, -o.loserAmount)
         }
         add(o.winnerId, prize - shares.values.sum())
         shares.forEach { (p, v) -> add(p, v) }

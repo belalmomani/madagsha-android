@@ -18,6 +18,9 @@ enum class OvershootPolicy { IGNORE_GAIN, BOUNCE_BACK }
 
 enum class LeftoverPolicy { SET_ASIDE }
 
+/** OWN_BID: الفائز يربح الطلب الذي طلبه هو، والخاسر يخسر الطلب الذي طلبه هو. FINAL_BID: الطلب الأعلى الحالي للطرفين. */
+enum class PayoutMode { OWN_BID, FINAL_BID }
+
 @Serializable
 data class RuleSettings(
     val cardsPerPlayer: Int = 4,
@@ -39,7 +42,10 @@ data class RuleSettings(
     /** في الشراكة: الجائزة تُوزَّع على زملاء الفريق فقط. */
     val teamPrizeOnlyTeammates: Boolean = true,
     /** الطلب مرة واحدة فقط لكل لاعب في الجولة؛ بعدها يستطيع الانسحاب أو المداقشة فقط. */
-    val oneBidPerPlayer: Boolean = true
+    val oneBidPerPlayer: Boolean = true,
+    val payoutMode: PayoutMode = PayoutMode.OWN_BID,
+    /** أقصى وقت للطلب بالثواني؛ عند انتهائه: سينكو تلقائي (أو انسحاب إن لم يعد سينكو مسموحًا). */
+    val turnSeconds: Int = 60
 ) {
     val sinko: Int get() = sinkoUnits * unitValue
     val step: Int get() = if (raiseStep > 0) raiseStep else sinko
