@@ -35,8 +35,7 @@ jobs:
       - name: Verify package + signature
         run: |
           AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -1); APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
-          for f in app/build/outputs/apk/*/*.apk; do echo "== $f"; $AAPT dump badging "$f" | grep -m1 "package: name='discussion.com.paper'" ; $APKSIGNER verify --print-certs "$f" || true; done
-      - uses: actions/upload-artifact@v4
+          for f in app/build/outputs/apk/*/*.apk; do echo "== $f"; $AAPT dump badging "$f" | grep -m1 "package: name='discussion.com.paper'" ; $APKSIGNER verify --print-certs "$f" || true; don
         with:
           name: apks
           path: |
