@@ -8,7 +8,7 @@ if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google
 
 android {
     namespace = "discussion.com.paper"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "discussion.com.paper"
         minSdk = 23
