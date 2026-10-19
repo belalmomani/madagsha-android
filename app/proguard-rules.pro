@@ -1,0 +1,8 @@
+-keep class com.startapp.** { *; }
+-dontwarn com.startapp.**
+-keepattributes *Annotation*
+-keep class discussion.com.paper.core.** { *; }
+-keepclassmembers class **$$serializer { *; }
+-keepclassmembers class kotlinx.serialization.json.** { *; }
+-dontwarn kotlinx.serialization.**
+-dontwarn com.google.firebase.**

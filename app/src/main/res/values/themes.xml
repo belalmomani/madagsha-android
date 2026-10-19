@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Madagsha" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0B3D24</item>
+        <item name="android:statusBarColor">#0B3D24</item>
+        <item name="android:navigationBarColor">#0B3D24</item>
+    </style>
+</resources>
