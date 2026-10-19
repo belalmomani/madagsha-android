@@ -6,7 +6,7 @@ import discussion.com.paper.core.Suit
 
 /** ربط كل ورقة بملف الصورة الخاص بها: res/drawable-nodpi/card_<rank>_<suit>.png (الظهر: card_back.png). */
 object CardAssets {
-    const val BACK = R.drawable.card_back
+    val BACK: Int get() = R.drawable.card_back
     fun face(c: Card): Int = when (c.rank to c.suit) {
         Rank.QASS to Suit.SPADES -> R.drawable.card_qass_spades
         Rank.QASS to Suit.HEARTS -> R.drawable.card_qass_hearts
