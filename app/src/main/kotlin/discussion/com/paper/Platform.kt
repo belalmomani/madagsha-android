@@ -22,7 +22,7 @@ class StartIoBackend(private val activity: Activity) : AdBackend {
     override fun init(): Boolean {
         if (BuildConfig.STARTIO_APP_ID.isBlank()) return false
         StartAppSDK.init(activity, BuildConfig.STARTIO_APP_ID, false)
-        StartAppSDK.setTestAdsEnabled(BuildConfig.DEBUG) // وضع الاختبار في نسخ debug
+        StartAppSDK.setTestAdsEnabled(BuildConfig.TEST_ADS) // gradle.properties: STARTIO_TEST_ADS
         StartAppAd.disableSplash()
         return true
     }

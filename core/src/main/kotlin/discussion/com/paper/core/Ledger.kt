@@ -38,10 +38,11 @@ class Ledger(val settings: RuleSettings, val playerIds: List<Int>, val teams: Li
     fun applyOutcome(o: RoundOutcome, shares: Map<Int, Int> = emptyMap()): RoundRecord {
         val prize = o.amount
         validateDistribution(o.winnerId, prize, shares)?.let { throw IllegalArgumentException(it) }
+        val loserExempt = settings.recipientGetsGiftOnly && o.loserId != null && o.loserId in shares.keys
         when (o) {
             is RoundOutcome.BidWon -> { }
-            is RoundOutcome.ChallengeWon -> if (settings.successfulChallengeBidderPays) add(o.loserId, -o.loserAmount)
-            is RoundOutcome.ChallengeLost -> if (settings.failedChallengePenalty) add(o.loserId, -o.loserAmount)
+            is RoundOutcome.ChallengeWon -> if (settings.successfulChallengeBidderPays && !loserExempt) add(o.loserId, -o.loserAmount)
+            is RoundOutcome.ChallengeLost -> if (settings.failedChallengePenalty && !loserExempt) add(o.loserId, -o.loserAmount)
         }
         add(o.winnerId, prize - shares.values.sum())
         shares.forEach { (p, v) -> add(p, v) }

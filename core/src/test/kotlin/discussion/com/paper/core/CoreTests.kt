@@ -119,6 +119,18 @@ class LedgerTests {
         val l = ledger(); l.applyOutcome(RoundOutcome.ChallengeWon(0, 3, 10, 25))
         assertEquals(10, l.balances[0]); assertEquals(-25, l.balances[3])
     }
+    @Test fun recipientGetsGiftOnly() {
+        val l = ledger(); l.applyOutcome(RoundOutcome.ChallengeWon(0, 3, 50, 80), mapOf(3 to 10))
+        assertEquals(40, l.balances[0]); assertEquals(10, l.balances[3])
+    }
+    @Test fun nonRecipientLoserStillPaysOwnBid() {
+        val l = ledger(); l.applyOutcome(RoundOutcome.ChallengeWon(0, 3, 50, 80), mapOf(1 to 10))
+        assertEquals(40, l.balances[0]); assertEquals(10, l.balances[1]); assertEquals(-80, l.balances[3])
+    }
+    @Test fun plainWinGiftOnly() {
+        val l = ledger(); l.applyOutcome(RoundOutcome.BidWon(0, 50), mapOf(2 to 10))
+        assertEquals(40, l.balances[0]); assertEquals(10, l.balances[2]); assertEquals(0, l.balances[1])
+    }
     @Test fun mustReachExactly5000() {
         val l = ledger(S.copy(targetScore = 100)); l.balances[0] = 95
         l.applyOutcome(RoundOutcome.BidWon(0, 10)); assertEquals(95, l.balances[0]); assertTrue(l.winners().isEmpty())

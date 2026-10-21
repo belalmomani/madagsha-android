@@ -13,8 +13,11 @@ android {
         applicationId = "discussion.com.paper"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // رقم يزيد مع كل بناء في GitHub ليُثبَّت كتحديث فوق النسخة السابقة
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = run
+        versionName = "1.0.$run"
+        buildConfigField("boolean", "TEST_ADS", providers.gradleProperty("STARTIO_TEST_ADS").orElse("true").get())
         buildConfigField("String", "STARTIO_APP_ID", "\"${providers.gradleProperty("STARTIO_APP_ID").orElse("").get()}\"")
     }
     signingConfigs {
@@ -30,6 +33,8 @@ android {
         }
     }
     buildTypes {
+        // نفس المفتاح الثابت لنسخة debug أيضًا: يمنع تعارض التثبيت بين الإصدارات
+        debug { signingConfigs.findByName("release")?.let { signingConfig = it } }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

@@ -45,7 +45,9 @@ data class RuleSettings(
     val oneBidPerPlayer: Boolean = true,
     val payoutMode: PayoutMode = PayoutMode.OWN_BID,
     /** أقصى وقت للطلب بالثواني؛ عند انتهائه: سينكو تلقائي (أو انسحاب إن لم يعد سينكو مسموحًا). */
-    val turnSeconds: Int = 60
+    val turnSeconds: Int = 60,
+    /** من يستلم هدية من الفائز يحصل على الهدية فقط، ولا يُخصم منه طلبه الخاص ولا يُحسب له. */
+    val recipientGetsGiftOnly: Boolean = true
 ) {
     val sinko: Int get() = sinkoUnits * unitValue
     val step: Int get() = if (raiseStep > 0) raiseStep else sinko
