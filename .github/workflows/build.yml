@@ -21,9 +21,9 @@ jobs:
         env: { KEYSTORE_B64: '${{ secrets.KEYSTORE_BASE64 }}' }
         run: |
           if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"; echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> $GITHUB_ENV; fi
-      - name: Build debug APK (only if no signing key is configured)
-        if: ${{ env.KEYSTORE_PATH == '' }}
-        run: gradle :app:assembleDebug
+      - name: Require fixed signing key (fail instead of building with a random key)
+        run: |
+          if [ -z "$KEYSTORE_PATH" ]; then echo "::error::KEYSTORE_BASE64 secret is missing. Add the 4 signing secrets so every build is signed with the SAME key (otherwise Android refuses to update)."; exit 1; fi
       - name: Build signed release APK + AAB (only when keystore secret exists)
         if: ${{ env.KEYSTORE_PATH != '' }}
         env:
@@ -32,10 +32,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           STARTIO_APP_ID: ${{ secrets.STARTIO_APP_ID }}
         run: gradle :app:assembleRelease :app:bundleRelease ${STARTIO_APP_ID:+-PSTARTIO_APP_ID="$STARTIO_APP_ID"}
-      - name: Verify package + signature
+      - name: Verify package + signing key
         run: |
           AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -1); APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
-          for f in app/build/outputs/apk/*/*.apk; do echo "== $f"; $AAPT dump badging "$f" | grep -m1 "package: name='discussion.com.paper'" ; $APKSIGNER verify --print-certs "$f" || true; done
+          EXPECTED=a6e6b7da63d0cb3c92a61a5b36e10aa129bb06559e86a0abca2c5864aa55cc89
+          for f in app/build/outputs/apk/*/*.apk; do
+            echo "== $f"; $AAPT dump badging "$f" | grep -m2 -E "package: name|versionCode"
+            SHA=$($APKSIGNER verify --print-certs "$f" | grep -m1 "SHA-256 digest" | awk '{print $NF}')
+            echo "signer SHA-256: $SHA"
+            if [ "$SHA" != "$EXPECTED" ]; then echo "::error::APK is not signed with the expected key"; exit 1; fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: apks
